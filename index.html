@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
 import {requireLogin,api,signOutUser,enablePush} from './auth.js';
-import {CAMPUS_MAP_URL} from './js/firebase-config.js';
+import {CAMPUS_MAP_URL} from './firebase-config.js';
 await requireLogin();
 const $=s=>document.querySelector(s),V=$('#v');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
