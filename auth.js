@@ -54,7 +54,7 @@
       google,
       reset,
       getToken
-    } from './js/auth.js';
+    } from './auth.js';
 
     const $ = id => document.getElementById(id);
     const fail = message => $('err').textContent = message;
