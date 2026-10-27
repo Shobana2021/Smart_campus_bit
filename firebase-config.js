@@ -1,4 +1,13 @@
-// Paste your Firebase web app config (Firebase Console > Project settings > Your apps).
-// While apiKey starts with "YOUR", the app runs in DEV mode (needs DEV_AUTH=true in backend/.env).
-export const firebaseConfig={apiKey:"YOUR_API_KEY",authDomain:"YOUR_PROJECT.firebaseapp.com",projectId:"YOUR_PROJECT",messagingSenderId:"YOUR_SENDER_ID",appId:"YOUR_APP_ID",vapidKey:"YOUR_WEB_PUSH_VAPID_KEY"};
-export const CAMPUS_MAP_URL="https://maps.app.goo.gl/k64yAm2ADqxWgS2L8";
+
+export const firebaseConfig = {
+  apiKey: "AIzaSyD-UtC1YbojpPDLgCTmLKjsf-UYsbdxwDA",
+  authDomain: "smart-campus-cd4c9.firebaseapp.com",
+  projectId: "smart-campus-cd4c9",
+  storageBucket: "smart-campus-cd4c9.firebasestorage.app",
+  messagingSenderId: "980986117350",
+  appId: "1:980986117350:web:4424ba3abcd46676e7cf27",
+  vapidKey: "YOUR_WEB_PUSH_VAPID_KEY"
+};
+
+export const CAMPUS_MAP_URL =
+  "https://maps.app.goo.gl/k64yAm2ADqxWgS2L8";
