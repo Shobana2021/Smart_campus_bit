@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Smart Campus</title>
+<link rel="stylesheet" href="styles.css"></head><body class="login"><div class="lbox">
+<div class="logo">🎓</div><h1>Smart Campus</h1><p>Bannari Amman Institute of Technology (BIT)</p>
+<label for="em">College email</label><input id="em" type="email" placeholder="studentname@bitsathy.ac.in" autocomplete="username">
+<label for="pw">Password</label><div class="pw"><input id="pw" type="password" placeholder="Your date of birth password" autocomplete="current-password"><button type="button" id="eye">Show</button></div>
+<div class="err" id="err" role="alert"></div>
+<button class="btn" id="go">Sign in</button><div class="or">or</div>
+<button class="btn ghost" id="gg">Continue with Google</button>
+<p style="margin:18px 0 0"><a href="#" id="fp">Forgot password?</a></p></div>
+<script type="module">
+import {signIn,google,reset,getToken,devMode} from './js/auth.js';
+const $=id=>document.getElementById(id),next=new URLSearchParams(location.search).get('next')||'/index.html';
+const fail=m=>$('err').textContent=m,ok=()=>location.replace(next.startsWith('/')?next:'/index.html');
+const dom=e=>e.trim().toLowerCase().endsWith('@bitsathy.ac.in');
+if(await getToken())ok();
+$('eye').onclick=()=>{const p=$('pw');p.type=p.type==='password'?'text':'password';$('eye').textContent=p.type==='password'?'Show':'Hide';};
+$('go').onclick=async()=>{fail('');const e=$('em').value;
+  if(!dom(e))return fail('Use your college email ending in @bitsathy.ac.in');
+  if(!devMode&&!$('pw').value)return fail('Enter your password');
+  try{await signIn(e.trim(),$('pw').value);ok();}catch(x){fail('Email or password is incorrect');}};
+$('gg').onclick=async()=>{fail('');try{await google();ok();}catch(x){fail(x.message);}};
+$('fp').onclick=async ev=>{ev.preventDefault();fail('');const e=$('em').value;if(!dom(e))return fail('Enter your college email first');
+  try{await reset(e.trim());fail('');alert('Password reset link sent to '+e);}catch(x){fail(x.message);}};
+</script></body></html>

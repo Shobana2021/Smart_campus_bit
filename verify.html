@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verify booking · Smart Campus</title><link rel="stylesheet" href="styles.css"></head><body>
+<header class="top"><div class="logo">SC</div><b>Verify booking</b></header><main>
+<p class="sub">Faculty only. Open a student’s QR pass with your phone camera, or paste the code here.</p>
+<input id="tk" placeholder="Booking code"><button class="btn" id="chk">Check booking</button><div id="out" style="margin-top:16px"></div></main>
+<script type="module">
+import {requireLogin,api} from './js/auth.js';
+await requireLogin();
+const $=id=>document.getElementById(id);
+async function check(t){
+  try{const r=await api('/verify/'+encodeURIComponent(t));
+    $('out').innerHTML=r.facility?`<div class="card" style="border:2px solid ${r.valid?'var(--ok)':'var(--bad)'}"><h2 style="margin:0 0 8px;color:${r.valid?'var(--ok)':'var(--bad)'}">${r.valid?'Valid booking ✓':'Not valid'}</h2>${r.reason?`<p>${r.reason}</p>`:''}<b>${r.student}</b><div class="mute">${r.email}</div><p>${r.facility}<br>${r.date} · ${r.time}</p></div>`:`<div class="card"><b style="color:var(--bad)">${r.reason}</b></div>`;
+  }catch(e){$('out').innerHTML=`<div class="card"><b style="color:var(--bad)">${e.message}</b></div>`;}}
+$('chk').onclick=()=>check($('tk').value.trim());
+const t=new URLSearchParams(location.search).get('t');if(t){$('tk').value=t;check(t);}
+</script></body></html>

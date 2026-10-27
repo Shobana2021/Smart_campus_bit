@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Smart Campus</title>
+<link rel="stylesheet" href="styles.css"></head><body>
+<header class="top"><div class="logo">SC</div><b>smartcampus</b><button class="bell" id="bell" aria-label="Notifications">🔔<i id="cnt" hidden></i></button><button class="av" id="av"></button></header>
+<main id="v"></main>
+<nav class="nav"><a href="#home">Home</a><a href="#facilities">Facilities</a><a href="#bookings">Bookings</a><a href="#lost">Lost &amp; Found</a><a href="#nexus">Nexus</a></nav>
+<div id="modal"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+import {requireLogin,api,signOutUser,enablePush} from './js/auth.js';
+import {CAMPUS_MAP_URL} from './js/firebase-config.js';
+await requireLogin();
+const $=s=>document.querySelector(s),V=$('#v');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iso=d=>d.toLocaleDateString('en-CA');
+const nice=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+function toast(m,err){const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),3200);}
+const run=async f=>{try{return await f();}catch(e){toast(e.message,1);}};
+const me=await api('/me'),cfg=await api('/config'),facs=await api('/facilities');
+$('#av').textContent=me.name[0].toUpperCase();$('#av').onclick=()=>{if(confirm('Sign out?'))signOutUser();};
+enablePush(t=>api('/fcm-token',{method:'POST',body:{token:t}}));
+let sel='SF',cat=null;
+const BLOCK_LABEL={IB:'IB',AS:'AS',MECH:'Mechanical',SF:'SF'};
+const typeName={classroom:'Classrooms',seminar:'Seminar halls',lab:'Laboratories',sports:'Sports areas'};
+
+async function bellCount(){const n=(await api('/notifications')).filter(x=>!x.read).length;$('#cnt').hidden=!n;$('#cnt').textContent=n;}
+$('#bell').onclick=()=>run(async()=>{const n=await api('/notifications');
+  sheet(`<h2 style="margin-top:0">Notifications</h2>${n.map(x=>`<div class="card"><b>${esc(x.title)}</b><div class="mute">${esc(x.body)}</div></div>`).join('')||'<p class="mute">No notifications yet. Booking updates show up here.</p>'}`);
+  await api('/notifications/read',{method:'POST'});bellCount();});
+function sheet(h){const m=$('#modal');m.innerHTML=`<div class="sheet"><div>${h}<button class="btn ghost" style="margin-top:12px" id="x">Close</button></div></div>`;
+  $('#x').onclick=close;m.firstChild.onclick=e=>{if(e.target===m.firstChild)close();};}
+const close=()=>$('#modal').innerHTML='';
+
+const views={
+ async home(){const b=(await api('/bookings/mine')).filter(x=>x.status==='booked'&&x.date>=iso(new Date()));
+  V.innerHTML=`<p class="sub" style="margin:0">${new Date().toLocaleDateString('en-GB',{weekday:'long'})}, your campus overview</p><h1>Good to see you, ${esc(me.name)}</h1><p class="sub">Here’s what’s happening around campus today.</p>
+  <a class="btn" href="#facilities">+ Book a space</a>
+  <div class="hero"><h2>Make room for great things.</h2><p>Find the right space for your next big idea.</p><a class="btn" href="#facilities">Explore facilities</a></div>
+  <h2>Quick access</h2><div class="grid">
+  <button class="tile" data-go="facilities"><b>Find a facility</b><span>Discover campus spaces</span></button>
+  <button class="tile" data-go="bookings"><b>My bookings</b><span>Manage reservations</span></button>
+  <a class="tile" style="text-decoration:none" href="${CAMPUS_MAP_URL}" target="_blank" rel="noopener"><b>Campus map</b><span>Find your destination</span></a>
+  <button class="tile" data-go="lost"><b>Lost &amp; Found</b><span>Help items find owners</span></button></div>
+  <h2>Upcoming bookings</h2>${b.map(bookCard).join('')||'<div class="card mute">Nothing booked yet. Pick a room to get started.</div>'}`;
+  V.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>location.hash=e.dataset.go);bindBook();},
+
+ async facilities(){
+  const blk=cfg.blocks.find(b=>b.code===sel)||cfg.blocks[0];
+  const shown=cat?facs.filter(f=>f.type===cat):facs.filter(f=>f.block===sel&&f.type==='classroom');
+  const title=cat?typeName[cat]:blk.name;
+  V.innerHTML=`<h1>Facilities</h1><p class="sub">Tap a block on the campus map to see its rooms.</p>
+  <div class="grid" style="gap:14px">${cfg.blocks.map(b=>`<button class="blk ${!cat&&sel===b.code?'on':''}" data-b="${b.code}">${BLOCK_LABEL[b.code]||b.code}</button>`).join('')}</div>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:14px">${['seminar','lab','sports'].map(t=>`<button class="blk ${cat===t?'on':''}" style="min-height:64px;font-size:15px" data-c="${t}">${{seminar:'Seminar Halls',lab:'Laboratories',sports:'Sports Areas'}[t]}</button>`).join('')}</div>
+  <div class="card" style="margin-top:20px"><b>Pinned place</b><div class="mute" style="margin:6px 0 14px">${blk.lat.toFixed(6)}, ${blk.lng.toFixed(6)}</div>
+  <div class="grid"><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${blk.lat},${blk.lng}">Get directions</a><a class="btn ghost sm" target="_blank" rel="noopener" href="${CAMPUS_MAP_URL}">View on map</a></div></div>
+  <h2>${title}</h2>${!cat?`<div class="mute" style="margin-bottom:8px">Also in ${blk.name}: <button class="chip" data-s="1">Seminar halls here</button></div>`:''}
+  ${(cat?shown:shown).map(f=>`<div class="card row"><span>${esc(f.name)}${f.block&&cat?` <span class="mute">· ${f.block}</span>`:''}</span><button class="btn ghost sm" data-f="${f.id}">Book</button></div>`).join('')}
+  ${!cat?facs.filter(f=>f.block===sel&&f.type==='seminar').map(f=>`<div class="card row seminar" hidden><span>${esc(f.name)}</span><button class="btn ghost sm" data-f="${f.id}">Book</button></div>`).join(''):''}`;
+  V.querySelectorAll('[data-b]').forEach(e=>e.onclick=()=>{sel=e.dataset.b;cat=null;views.facilities();});
+  V.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>{cat=cat===e.dataset.c?null:e.dataset.c;views.facilities();});
+  const s=V.querySelector('[data-s]');if(s)s.onclick=()=>V.querySelectorAll('.seminar').forEach(e=>e.hidden=!e.hidden);
+  V.querySelectorAll('[data-f]').forEach(e=>e.onclick=()=>openBook(facs.find(f=>f.id==e.dataset.f)));},
+
+ async bookings(){const b=await api('/bookings/mine');
+  V.innerHTML=`<h1>My bookings</h1><p class="sub">Show your QR pass to faculty to verify a booking.</p>${b.map(bookCard).join('')||'<div class="card mute">No bookings yet.</div>'}`;bindBook();},
+
+ async lost(q=''){const l=await api('/lost?q='+encodeURIComponent(q));
+  V.innerHTML=`<p class="sub" style="margin:0">Community care</p><h1>Lost something?</h1><p class="sub">Small acts help belongings find their way home.</p>
+  <div class="card"><h2 style="margin-top:0">Post a report</h2><label>Report type</label><select id="lt"><option value="lost">Lost</option><option value="found">Found</option></select>
+  <label>Item name</label><input id="li" placeholder="e.g. Blue water bottle"><label>Description</label><textarea id="ld" rows="3" placeholder="Colour, brand or identifying details"></textarea>
+  <label>Where was it lost/found?</label><select id="ll">${cfg.blocks.map(b=>`<option>${b.name}</option>`).join('')}<option>Library</option><option>Canteen</option><option>Sports area</option><option>Other</option></select>
+  <label>Date</label><input id="lw" type="date" value="${iso(new Date())}"><button class="btn" id="lp">+ Publish report</button></div>
+  <input id="ls" placeholder="Search reports…" value="${esc(q)}">
+  ${l.map(r=>`<div class="card"><div class="row"><b>${esc(r.item)}</b><span class="tag ${r.type}">${r.type}</span></div><div class="mute">${esc(r.description||'')}</div><div class="mute" style="margin-top:6px">${esc(r.location||'')} · ${nice(r.date)}</div><div class="mute">Posted by ${esc(r.reporter)} (${esc(r.email)})</div>${r.mine||me.role==='admin'?`<button class="btn ghost sm" style="margin-top:10px" data-r="${r.id}">Mark as resolved</button>`:''}</div>`).join('')||'<div class="card mute">No reports match.</div>'}`;
+  $('#lp').onclick=()=>run(async()=>{await api('/lost',{method:'POST',body:{type:$('#lt').value,item:$('#li').value,description:$('#ld').value,location:$('#ll').value,date:$('#lw').value}});toast('Report published');views.lost();});
+  $('#ls').onchange=e=>views.lost(e.target.value);
+  V.querySelectorAll('[data-r]').forEach(e=>e.onclick=()=>run(async()=>{await api('/lost/'+e.dataset.r+'/resolve',{method:'POST'});toast('Marked as resolved');views.lost();}));},
+
+ async nexus(){
+  V.innerHTML=`<h1>Hey, I’m Nexus</h1><p class="sub">Ask me about campus services.</p><div id="chat"><div class="msg">Hi! I’m Nexus, your campus helper. Ask me about bookings, QR passes, campus locations or Lost &amp; Found.</div></div>
+  <div>${['How do I book a room?','How do QR passes work?','Where is the campus map?','How do I report a lost item?','What are the class periods?'].map(q=>`<button class="chip">${q}</button>`).join('')}</div>
+  <div class="row" style="margin-top:10px"><input id="nq" placeholder="Ask Nexus anything…" style="margin:0"><button class="btn sm" id="na">Ask</button></div>`;
+  const ask=async t=>{if(!t.trim())return;const c=$('#chat');c.insertAdjacentHTML('beforeend',`<div class="msg me">${esc(t)}</div>`);$('#nq').value='';
+    const r=await api('/nexus',{method:'POST',body:{message:t}});c.insertAdjacentHTML('beforeend',`<div class="msg">${esc(r.reply)}</div>`);};
+  V.querySelectorAll('.chip').forEach(e=>e.onclick=()=>ask(e.textContent));$('#na').onclick=()=>ask($('#nq').value);$('#nq').onkeydown=e=>e.key==='Enter'&&ask(e.target.value);}
+};
+
+function bookCard(b){const live=b.status==='booked';
+  return `<div class="card"><div class="row"><b>${esc(b.facility)}</b><span class="tag ${live?'':'cancelled'}">${live?'Booked':'Cancelled'}</span></div><div class="mute">${nice(b.date)} · ${cfg.periods[b.period]}</div>
+  ${live?`<div class="grid" style="margin-top:12px"><button class="btn sm" data-qr="${b.qr_token}" data-t="${esc(b.facility)}">QR pass</button><button class="btn ghost sm" data-cx="${b.id}">Cancel</button></div>`:''}</div>`;}
+function bindBook(){
+  V.querySelectorAll('[data-qr]').forEach(e=>e.onclick=()=>{sheet(`<h2 style="margin-top:0">${e.dataset.t}</h2><p class="mute">Show this to faculty to verify your booking.</p><div id="qr"></div>`);
+    new QRCode($('#qr'),{text:location.origin+'/verify.html?t='+e.dataset.qr,width:220,height:220});});
+  V.querySelectorAll('[data-cx]').forEach(e=>e.onclick=()=>confirm('Cancel this booking?')&&run(async()=>{await api('/bookings/'+e.dataset.cx,{method:'DELETE'});toast('Booking cancelled');bellCount();route();}));}
+
+function openBook(f){
+  let d=iso(new Date());if(new Date(d+'T00:00:00').getDay()===0){const n=new Date();n.setDate(n.getDate()+1);d=iso(n);}
+  sheet(`<h2 style="margin-top:0">Book ${esc(f.name)}</h2><label>Date</label><input type="date" id="bd" min="${iso(new Date())}" value="${d}"><div id="sl"></div>`);
+  const load=()=>run(async()=>{const dt=$('#bd').value;
+    if(new Date(dt+'T00:00:00').getDay()===0){$('#sl').innerHTML='<p class="mute">Bookings are closed on Sundays. Pick another date.</p>';return;}
+    const s=await api(`/facilities/${f.id}/slots?date=${dt}`);
+    $('#sl').innerHTML=s.map(p=>`<button class="slot ${p.state}" data-i="${p.i}" ${p.state==='booked'||p.state==='mine'?'disabled':''}><span>Period ${p.i+1} · ${p.label}</span><span>${{free:'Available',booked:'Booked',mine:'Your booking',busy:'Conflict'}[p.state]}</span></button>`).join('')+'<p class="mute">Breaks and lunch can’t be booked.</p>';
+    $('#sl').querySelectorAll('[data-i]').forEach((b,i)=>b.onclick=()=>run(async()=>{
+      if(s[i].state==='busy')return toast('Warning: '+s[i].note+' at this time.',1);
+      await api('/bookings',{method:'POST',body:{facility_id:f.id,date:dt,period:s[i].i}});toast('Booking confirmed ✓');bellCount();load();}));});
+  $('#bd').onchange=load;load();}
+
+async function route(){const h=(location.hash||'#home').slice(1);const k=views[h]?h:'home';
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.hash==='#'+k));close();await run(()=>views[k]());scrollTo(0,0);}
+addEventListener('hashchange',route);route();bellCount();setInterval(bellCount,60000);
+</script></body></html>

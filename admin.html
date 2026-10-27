@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin · Smart Campus</title><link rel="stylesheet" href="styles.css"></head><body style="padding-bottom:30px">
+<header class="top"><div class="logo" style="background:var(--navy)">🎓</div><b style="line-height:1.1">Smart Campus<br><small class="mute" style="font-weight:400">BIT · Admin Control Center</small></b><button class="btn ghost sm" id="out">Sign out</button></header>
+<main><h2 style="margin-top:0">Overview</h2><div class="grid" id="st"></div>
+<h2>Bookings</h2><div class="card" style="overflow:auto"><table id="bk"></table></div>
+<h2>Facilities</h2><div class="card"><div class="grid"><input id="fn" placeholder="Name, e.g. IB 107"><select id="ft"><option value="classroom">Classroom</option><option value="seminar">Seminar hall</option><option value="lab">Lab</option><option value="sports">Sports</option></select></div>
+<select id="fb"><option value="">No block</option><option>IB</option><option>AS</option><option>MECH</option><option>SF</option></select><button class="btn" style="background:var(--navy)" id="fa">Add facility</button></div>
+<div class="card" id="fl"></div></main>
+<script type="module">
+import {requireLogin,api,signOutUser} from './js/auth.js';
+await requireLogin();
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+$('out').onclick=signOutUser;
+try{
+const cfg=await api('/config');
+async function load(){
+ const s=await api('/admin/stats');
+ $('st').innerHTML=[['Total students',s.students],['Upcoming bookings',s.bookings],['Facilities',s.facilities],['Open lost & found',s.lost]].map(([a,b])=>`<div class="card stat"><span class="mute">${a}</span><b>${b}</b></div>`).join('');
+ const b=await api('/admin/bookings');
+ $('bk').innerHTML='<tr><th>Student</th><th>Facility</th><th>When</th><th></th></tr>'+b.map(x=>`<tr><td>${esc(x.student)}</td><td>${esc(x.facility)}</td><td>${x.date}<br>${cfg.periods[x.period]}</td><td>${x.status==='booked'?`<button class="btn ghost sm" data-c="${x.id}">Cancel</button>`:'<span class="tag cancelled">Cancelled</span>'}</td></tr>`).join('');
+ $('bk').querySelectorAll('[data-c]').forEach(e=>e.onclick=async()=>{if(confirm('Cancel this booking?')){await api('/bookings/'+e.dataset.c,{method:'DELETE'});load();}});
+ const f=await api('/facilities');
+ $('fl').innerHTML=f.map(x=>`<div class="row" style="padding:6px 0"><span>${esc(x.name)} <span class="mute">${x.type}</span></span><button class="btn ghost sm" data-d="${x.id}">Remove</button></div>`).join('');
+ $('fl').querySelectorAll('[data-d]').forEach(e=>e.onclick=async()=>{if(confirm('Remove this facility?')){await api('/admin/facilities/'+e.dataset.d,{method:'DELETE'});load();}});}
+$('fa').onclick=async()=>{try{await api('/admin/facilities',{method:'POST',body:{name:$('fn').value,type:$('ft').value,block:$('fb').value}});$('fn').value='';load();}catch(e){alert(e.message);}};
+await load();
+}catch(e){document.querySelector('main').innerHTML=`<div class="card"><b>${e.message}</b><p class="mute">This page is for admins. Add your email to ADMIN_EMAILS in backend/.env.</p></div>`;}
+</script></body></html>
